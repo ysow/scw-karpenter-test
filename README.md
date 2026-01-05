@@ -1,46 +1,46 @@
-# Contrôleur Karpenter pour Scaleway GPU
+# Karpenter Controller for Scaleway GPU
 
-Ce projet est un contrôleur Kubernetes personnalisé conçu pour intégrer [Karpenter](https://karpenter.sh/) avec [Scaleway](https://www.scaleway.com/), permettant à Karpenter de provisionner dynamiquement des instances GPU Scaleway en réponse à la demande de vos charges de travail.
+This project is a custom Kubernetes controller designed to integrate [Karpenter](https://karpenter.sh/) with [Scaleway](https://www.scaleway.com/), allowing Karpenter to dynamically provision Scaleway GPU instances in response to your workload demands.
 
-Lorsque Karpenter doit provisionner un nœud GPU, il crée une ressource `NodeClaim`. Ce contrôleur surveille ces `NodeClaims` et, s'ils sont configurés pour le type de capacité `scaleway-gpu`, il se charge de créer l'instance correspondante via l'API Scaleway.
+When Karpenter needs to provision a GPU node, it creates a `NodeClaim` resource. This controller monitors these `NodeClaims` and, if they are configured for the `scaleway-gpu` capacity type, it handles the creation of the corresponding instance via the Scaleway API.
 
-## Fonctionnalités
+## Features
 
-- **Provisionnement automatique** : Crée des instances GPU Scaleway lorsque des `NodeClaims` correspondants apparaissent.
-- **Sélection dynamique du type d'instance** : Lit le label `karpenter.sh/instance-type` sur le `NodeClaim` pour provisionner le type de GPU demandé (ex: L4, L40s, 3070).
-- **Configuration par `cloud-init`** : Utilise un script `cloud-init` pour configurer le nœud au démarrage et le joindre automatiquement au cluster Kubernetes.
-- **Sécurisé** : Construit sur une image Docker `distroless/static` pour une surface d'attaque minimale.
-- **Flexible** : Le mappage des types d'instance et le script `cloud-init` sont facilement personnalisables.
+- **Automatic Provisioning**: Creates Scaleway GPU instances when corresponding `NodeClaims` appear.
+- **Dynamic Instance Type Selection**: Reads the `karpenter.sh/instance-type` label on the `NodeClaim` to provision the requested GPU type (e.g., L4, L40s, 3070).
+- **`cloud-init` Configuration**: Uses a `cloud-init` script to configure the node on startup and automatically join it to the Kubernetes cluster.
+- **Secure**: Built on a `distroless/static` Docker image for a minimal attack surface.
+- **Flexible**: The instance type mapping and `cloud-init` script are easily customizable.
 
 ---
 
-## Tutoriel de Déploiement
+## Deployment Tutorial
 
-Suivez ces étapes pour déployer et utiliser le contrôleur dans votre cluster.
+Follow these steps to deploy and use the controller in your cluster.
 
-### Pré-requis
+### Prerequisites
 
-- Un cluster Kubernetes fonctionnel.
-- `kubectl` configuré pour accéder à votre cluster.
-- Karpenter installé dans votre cluster.
-- Un compte Scaleway avec des clés d'API (`SCW_ACCESS_KEY`, `SCW_SECRET_KEY`, `SCW_DEFAULT_PROJECT_ID`).
-- Docker installé localement pour construire l'image.
-- Go (version 1.21+) installé localement.
+- A functional Kubernetes cluster.
+- `kubectl` configured to access your cluster.
+- Karpenter installed in your cluster.
+- A Scaleway account with API keys (`SCW_ACCESS_KEY`, `SCW_SECRET_KEY`, `SCW_DEFAULT_PROJECT_ID`).
+- Docker installed locally to build the image.
+- Go (version 1.21+) installed locally.
 
-### Étape 1 : Cloner le projet
+### Step 1: Clone the project
 
 ```bash
-git clone https://github.com/votre-repo/scw-karpenter.git
+git clone https://github.com/your-repo/scw-karpenter.git
 cd scw-karpenter
 ```
 
-### Étape 2 : Configurer les identifiants Scaleway
+### Step 2: Configure Scaleway credentials
 
-Le contrôleur a besoin de vos clés d'API Scaleway pour fonctionner. Le fichier `deploy.yaml` contient un template de Secret pour les stocker.
+The controller needs your Scaleway API keys to work. The `deploy.yaml` file contains a Secret template to store them.
 
-1.  Ouvrez le fichier `deploy.yaml`.
-2.  Localisez la section du `Secret` `scaleway-credentials`.
-3.  Remplacez les placeholders `<...>` par vos propres clés et projet ID.
+1.  Open the `deploy.yaml` file.
+2.  Locate the `scaleway-credentials` `Secret` section.
+3.  Replace the `<...>` placeholders with your own keys and project ID.
 
 ```yaml
 apiVersion: v1
@@ -50,53 +50,53 @@ metadata:
   namespace: default
 type: Opaque
 stringData:
-  SCW_ACCESS_KEY: "<VOTRE_SCW_ACCESS_KEY>"
-  SCW_SECRET_KEY: "<VOTRE_SCW_SECRET_KEY>"
-  SCW_DEFAULT_PROJECT_ID: "<VOTRE_SCW_DEFAULT_PROJECT_ID>"
+  SCW_ACCESS_KEY: "<YOUR_SCW_ACCESS_KEY>"
+  SCW_SECRET_KEY: "<YOUR_SCW_SECRET_KEY>"
+  SCW_DEFAULT_PROJECT_ID: "<YOUR_SCW_DEFAULT_PROJECT_ID>"
   SCW_DEFAULT_REGION: "fr-par"
   SCW_DEFAULT_ZONE: "fr-par-1"
 ```
 
-### Étape 3 : Construire et Pousser l'image Docker
+### Step 3: Build and Push the Docker image
 
-1.  Construisez l'image Docker en utilisant le `Dockerfile` fourni :
+1.  Build the Docker image using the provided `Dockerfile`:
     ```bash
-    docker build -t votre-registre/scw-karpenter:latest .
+    docker build -t your-registry/scw-karpenter:latest .
     ```
 
-2.  Poussez l'image vers votre registre de conteneurs (Docker Hub, GCR, etc.) :
+2.  Push the image to your container registry (Docker Hub, GCR, etc.):
     ```bash
-    docker push votre-registre/scw-karpenter:latest
+    docker push your-registry/scw-karpenter:latest
     ```
 
-3.  Mettez à jour le nom de l'image dans `deploy.yaml`. Localisez la section `Deployment` et changez la ligne `image` :
+3.  Update the image name in `deploy.yaml`. Locate the `Deployment` section and change the `image` line:
     ```yaml
-    # ... dans le Deployment scw-karpenter-controller
+    # ... in the scw-karpenter-controller Deployment
     spec:
       containers:
       - name: controller
-        image: votre-registre/scw-karpenter:latest # <-- Mettez à jour ici
+        image: your-registry/scw-karpenter:latest # <-- Update here
     # ...
     ```
 
-### Étape 4 : Déployer le contrôleur
+### Step 4: Deploy the controller
 
-Appliquez le fichier `deploy.yaml` pour créer le `Secret`, les `ClusterRole/Binding` et le `Deployment` du contrôleur.
+Apply the `deploy.yaml` file to create the `Secret`, `ClusterRole/Binding`, and the controller's `Deployment`.
 
 ```bash
 kubectl apply -f deploy.yaml
 ```
 
-Vérifiez que le pod du contrôleur est en cours d'exécution :
+Check that the controller pod is running:
 ```bash
 kubectl get pods -l app=scw-karpenter
 ```
 
-### Étape 5 : Configurer un Provisioner Karpenter
+### Step 5: Configure a Karpenter Provisioner
 
-Créez un `Provisioner` Karpenter qui cible notre type de capacité personnalisé `scaleway-gpu`.
+Create a Karpenter `Provisioner` that targets our custom `scaleway-gpu` capacity type.
 
-Créez un fichier `karpenter-provisioner.yaml` :
+Create a `karpenter-provisioner.yaml` file:
 ```yaml
 apiVersion: karpenter.sh/v1alpha5
 kind: Provisioner
@@ -107,31 +107,31 @@ spec:
     - key: karpenter.sh/capacity-type
       operator: In
       values: ["scaleway-gpu"]
-  # Définissez les types d'instances que vous autorisez
-  # Ces noms doivent correspondre à ceux dans la fonction getCommercialType
-  # de controller.go (ex: "l4", "l40s").
+  # Define the instance types you allow
+  # These names must match those in the getCommercialType function
+  # in controller.go (e.g., "l4", "l40s").
   limits:
     resources:
       cpu: 1000
       memory: 1000Gi
   provider:
-    # Le champ provider est requis par Karpenter,
-    # mais notre contrôleur s'occupe de la logique.
-    # Nous le laissons vide.
+    # The provider field is required by Karpenter,
+    # but our controller handles the logic.
+    # We leave it empty.
     {}
   ttlSecondsAfterEmpty: 30
 ```
 
-Appliquez-le :
+Apply it:
 ```bash
 kubectl apply -f karpenter-provisioner.yaml
 ```
 
-### Étape 6 : Tester le provisionnement d'un GPU
+### Step 6: Test GPU provisioning
 
-Maintenant, créez une charge de travail qui demande une ressource GPU. Karpenter interceptera cette demande et créera un `NodeClaim`.
+Now, create a workload that requests a GPU resource. Karpenter will intercept this request and create a `NodeClaim`.
 
-Créez un fichier `test-pod.yaml` :
+Create a `test-pod.yaml` file:
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -148,48 +148,48 @@ spec:
         nvidia.com/gpu: "1"
       limits:
         nvidia.com/gpu: "1"
-  # Le pod doit explicitement tolérer le taint des NodeClaims
+  # The pod must explicitly tolerate the NodeClaims taint
   tolerations:
   - key: "karpenter.sh/capacity-type"
     operator: "Exists"
-  # Spécifiez le type d'instance GPU souhaité
+  # Specify the desired GPU instance type
   nodeSelector:
     karpenter.sh/instance-type: l4
 ```
 
-Déployez le pod :
+Deploy the pod:
 ```bash
 kubectl apply -f test-pod.yaml
 ```
 
-### Étape 7 : Vérifier le résultat
+### Step 7: Check the result
 
-1.  **Regardez les logs de votre contrôleur**. Vous devriez voir des messages indiquant qu'il a reçu un `NodeClaim` et qu'il crée une instance Scaleway.
+1.  **Look at your controller's logs**. You should see messages indicating that it has received a `NodeClaim` and is creating a Scaleway instance.
     ```bash
     kubectl logs -f -l app=scw-karpenter
     ```
-    Vous devriez voir une ligne comme :
+    You should see a line like:
     `INFO   creating scaleway instance with cloud-init   {"commercialType": "GPU-L4-S"}`
 
-2.  **Vérifiez la création du `NodeClaim`**.
+2.  **Check the `NodeClaim` creation**.
     ```bash
     kubectl get nodeclaims
     ```
 
-3.  **Vérifiez l'arrivée du nouveau nœud**. Après quelques minutes, l'instance Scaleway démarrera, exécutera le script `cloud-init` et rejoindra le cluster.
+3.  **Check the arrival of the new node**. After a few minutes, the Scaleway instance will start, execute the `cloud-init` script, and join the cluster.
     ```bash
     kubectl get nodes
     ```
-    Un nouveau nœud provisionné par Karpenter devrait apparaître.
+    A new node provisioned by Karpenter should appear.
 
 ---
 
-## Personnalisation
+## Customization
 
-### Ajouter des types d'instance GPU
+### Add GPU instance types
 
-Pour supporter d'autres types de GPU Scaleway, modifiez la fonction `getCommercialType` dans le fichier `controller.go` en ajoutant une nouvelle entrée dans `instanceTypeMap`.
+To support other types of Scaleway GPUs, modify the `getCommercialType` function in the `controller.go` file by adding a new entry to the `instanceTypeMap`.
 
-### Modifier le script de démarrage
+### Modify the startup script
 
-Le script `cloud-init` est généré par la fonction `generateUserData` dans `utils.go`. Vous pouvez modifier cette fonction pour changer la manière dont les nœuds sont configurés au démarrage. N'oubliez pas de remplacer le placeholder `<cluster-endpoint>` par le véritable endpoint de votre API server Kubernetes.
+The `cloud-init` script is generated by the `generateUserData` function in `utils.go`. You can modify this function to change how nodes are configured on startup. Don't forget to replace the `<cluster-endpoint>` placeholder with the actual endpoint of your Kubernetes API server.
